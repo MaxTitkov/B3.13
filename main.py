@@ -1,165 +1,114 @@
 
+""" 
+Вывод html-кода на консоль или в файл определяется атрибутом output класса HTML 
+Если значение атрибута заканчивается на ".html" вывод осуществляется в файл с соответствующим именем
 """
 
-  Добавление тегов реализовал без контекстного менеджера.
-  Запись в файл с помощью контекстного менеджера.
-  Класс Tag наследуется от класса TopLevelTag. 
-  Можно было обойтись одним только Tag (без TopLevelTag), 
-  но сделал его, так как это было в условиях.
+class Tag:
+    def __init__(self, tag, is_single=None, klass=None, **kwargs):
+        self.tag = tag
+        self.text = ""
+        self.attributes = {}
+        self.is_single = is_single
 
-"""
+        if klass is not None:
+            self.attributes["class"] = " ".join(klass)
 
-class TopLevelTag:
-  
-  "Класс используется для создания тегов body и head"
-  
-  def __init__(self, tag):
-    self.tag = tag
-    
-  def __str__(self, *args):
-    return self.wrap(*args)
-  
-  def wrap(self, obj):
-    return "<{tag}>{html}</{tag}>".format(tag = self.tag, html=str(obj))
-  
-class Tag(TopLevelTag):
-  
-  """Класс используется для создания тегов body и head
-  Аргументы:
-  self.tag = тег
-  self.is_single = одиночный/двойной
-  self.text = текст
-  self.attributes_str = служебный для последнующего добавления атрибутов (id, class и т.д.)
-  """
-  
-  def __init__(self, tag, text="", is_single=False, **kwargs):
-    self.tag = tag
-    self.is_single = is_single
-    self.text = text
-    self.attributes_str = ""
-    
-    attributes_list = []
-    if kwargs is not None:
-      for attr, value in kwargs.items():
-        if attr == "klass":
-          attributes_list.append('class="%s"'%(value))
-        else:
-          attributes_list.append('class="%s=%s"'%(attr, value))
-    self.attributes_str = " ".join(attributes_list)
-  
-  def __str__(self, *args):
-    return self.wrap(*args)
-  
-  def wrap(self, *args):
-    """
-      Данный метод оборачивает все объекты в стуркуру html кроме случаев, если тег одиночный
-    """
-    objects_html_string = ""
-    if self.is_single:
-      return '<{tag} {attributes}/>'.format(tag=self.tag, attributes = self.attributes_str)
-    else:
-      if args:
-        objects_html = []
-        for obj in args:
-          objects_html.append(""+str(obj))
-        objects_html_string = "".join(objects_html)
-        
-        return '<{tag} {attributes}>{text}{objects}<{tag}/>'.format(tag=self.tag, text = self.text, attributes = self.attributes_str, objects = objects_html_string)
-      
-      else:
-        return '<{tag} {attributes}>{text}<{tag}/>'.format(tag=self.tag, text = self.text, attributes = self.attributes_str)
+        for attr, value in kwargs.items():
+            if "_" in attr:
+                attr = attr.replace("_", "-")
+            self.attributes[attr] = value
 
-
-class HTML:
-  
-  """
-   Данный класс формирует правильную структуру html документа, 
-   при необходимости добавляет отступы, сохраняет и дописывает в файл.
-   Работа с классом доступна из контекстного медеджера.
-   
-   Аргументы:
-    self.print_result {True, False} выводить/не выводить html
-    self.output_file {str} имя файла
-    self.add_tabs {True, False} добавлять/не добавлять пробелы
-    self.html служебный атибут
-    self.add_to_file {True, False} записать файл заново либо добавить html в конец
-  """
-  
-  def __init__(self, print_result = True, output_file=None, add_tabs = True, add_to_file = False):
-    self.print_result = print_result
-    self.output_file = output_file
-    self.add_tabs = add_tabs
-    self.html = ""
-    self.add_to_file = add_to_file
-    
-  def prepare_html(self, html):
-    ending_html = ""
-    for idx in range(len(self.html)):
-      ending_html += html[idx]
-      try:
-        if html[idx] == ">" and html[idx+1] == "<":
-            ending_html += "\n"
-      except:
-        if html[idx] == ">":
-          ending_html += "\n"
-          
-    if not self.add_tabs:
-      return ending_html
-          
-    
-    else:
-      ending_html_tab = ""
-      num_of_strings = len(ending_html.split("\n"))//2 + len(ending_html.split("\n"))%2
-      len_list = [i-1 for i in range(num_of_strings)]
-      reverse_list = len_list[::-1]
-      len_list.extend(reverse_list[1:])
-      len_iter = iter(len_list)
-
-      for line in ending_html.split("\n"):
-        try:
-          ending_html_tab += "\t"*next(len_iter)+line+'\n'
-        except:
-          pass
-        
-
-      if self.add_tabs == True:
-        return ending_html_tab
-    
-  def __add__(self, object):
-    self.html = str(object)
-    prepared_html = self.prepare_html(self.html)
-    return prepared_html
-    
-  def __enter__(self):
+    def __enter__(self):
         return self
+
+    def __exit__(self, type, value, trackback):
+        pass
+
+    def __str__(self):
+        attrs = []
+        for attribute, value in self.attributes.items():
+            attrs.append('%s="%s"' % (attribute, value))
+        if attrs: # Проверяем, что attrs не пуст, иначе уибраем пробел между названием тега и атрибутами
+            attrs = " " + " ".join(attrs)
+        else:
+            attrs = ""
+        if self.is_single:
+            return "<{tag}{attrs}/>".format(tag=self.tag, attrs=attrs)
+        else:
+            return "<{tag}{attrs}>{text}</{tag}>".format(
+            tag=self.tag, attrs=attrs, text=self.text
+            )
+
+    def __iadd__(self, other):
+        if not self.text.endswith("\n"):
+            self.text += "\n"
+        for line in str(other).split("\n"):
+            if line:
+                self.text += "\t{element}\n".format(element=line)
+        return self
+
+class TopLevelTag(Tag):
     
-  def __str__(self):
-    return self.html
-  
-  def __exit__(self, type, value, traceback):
-    if self.print_result:
-      print(self.prepare_html(self.html))
-    if self.output_file is not None:
-      if self.add_to_file:
-        with open(self.output_file, "a") as file:
-          file.write(self.html)
-      else:
-        with open(self.output_file, "w") as file:
-          file.write(self.html)
+    """ Переопределен вывод html-кода """
+    
+    def __enter__(self):
+        return self
+
+    def __str__(self):
+        return "<{tag}>{text}</{tag}>\n".format(tag=self.tag, text=self.text)
+
+class HTML(Tag):
+    
+    """ Если при создании экземпляра класса передать в параметре строку, 
+    которая заканчивается на .html, будет создан файл. 
+    Иначе результат будет выведен на экран  """
+    
+    def __init__(self, output):
+        self.tag = "html"
+        self.output = output
+        self.text = ""
+
+    def __str__(self):
+        return "<{tag}>\n{text}</{tag}>\n".format(tag=self.tag, text=self.text)
+
+    def __iadd__(self, other):
+        self.text += str(other)
+        return self
+
+    def __exit__(self, type, value, traceback):
+        if self.output is not None and ".html" in self.output:
+            print("Вывод в файл ./" + self.output)
+            f = open(self.output, mode='w', encoding='utf-8')
+            f.write(str(self))
+            f.close
+        else:
+            print(str(self))
+
+
 
 
 if __name__ == "__main__":
-      # Пример:
+    with HTML(output="index.html") as doc:
+        with TopLevelTag("head") as head:
+            with Tag("title") as title:
+                title.text = "hello"
+                head += title
+            doc += head
 
-  head = TopLevelTag(tag="head") #объект заголовка документа
-  body = TopLevelTag(tag="body") #объект тела документа
+        with TopLevelTag("body") as body:
+            with Tag("h1", klass=("main-text",)) as h1:
+                h1.text = "Test"
+                body += h1
 
-  title = Tag(tag="title", text = "Document title") #объект хедера
-  jumbotron = Tag("div", klass="jumbotron", id="jumbotron", text = "Lorem Ipsum") #объект div jumbotron
-  div = Tag("div", klass="container", id="container") #объект div контейнер
-  img = Tag("img", is_single=True, klass="image", id="image")
+            with Tag("div", klass=("container", "container-fluid"), id="lead") as div:
+                with Tag("p") as paragraph:
+                    paragraph.text = "another test"
+                    div += paragraph
 
-  with HTML(add_tabs=True,print_result = True, add_to_file=False, output_file = "index.html") as html_file:
-    html_file += body.wrap(jumbotron.wrap(jumbotron, div, img)) #добавим объекту body jumbotron, container и непарный img
-    with HTML(add_tabs=True, print_result = True, add_to_file=True, output_file = "index.html") as html_file1:
-      html_file1 += head.wrap(title) #добавим объекту head заголовок title
+                with Tag("img", is_single=True, src="/icon.png") as img:
+                    div += img
+
+                body += div
+
+            doc += body
