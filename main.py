@@ -1,4 +1,3 @@
-
 """ 
 Вывод html-кода  определяется атрибутом output класса HTML 
 """
@@ -83,10 +82,7 @@ class HTML(Tag):
             f.close
         else:
             print(str(self))
-
-
-
-
+            
 if __name__ == "__main__":
     with HTML(output="index.html") as doc:
         with TopLevelTag("head") as head:
